@@ -60,37 +60,51 @@ export const getFeed = async (page = 1,limit =12) =>{
 
 
 //search videos
-
-export const searchVideos = async(q,page=1,limit = 12)=>{
-    if(!q || q.trim === "")
-        return {page,limit,total:0,totalPages:0,data:[]};
+export const searchVideos = async (q, page = 1, limit = 12) => {
+    if (!q || q.trim() === "")
+        return { page, limit, total: 0, totalPages: 0, data: [] };
 
     const skip = (page - 1) * limit;
 
-    const results = await Video.find(  
-           { $text: { $search: q },status : "ready"},
-           {score : {$meta : "textScore"}}
+    // 1️⃣ Attempt FULL TEXT SEARCH
+    let results = await Video.find(
+        {
+            $text: { $search: q },
+            status: { $in: ["ready", "uploaded"] }
+        },
+        { score: { $meta: "textScore" } }
     )
-    .sort({score : {$meta : "textScore"},createdAt : -1})
+    .sort({ score: { $meta: "textScore" }, createdAt: -1 })
     .skip(skip)
     .limit(limit)
     .select("title thumbnailUrl videoUrl duration owner views likesCount createdAt")
-    .populate("owner","name avaatar")
+    .populate("owner", "name avatar")
     .lean();
 
-    const total = await Video.countDocuments({
-        $text: { $search: q },
-        status : "ready"
-    });
+    // 2️⃣ If text search returns nothing → use regex fallback
+    if (results.length === 0) {
+        results = await Video.find({
+            title: { $regex: q, $options: "i" },
+            status: { $in: ["ready", "uploaded"] }
+        })
+        .skip(skip)
+        .limit(limit)
+        .populate("owner", "name avatar")
+        .lean();
+    }
+
+    const total = results.length;
 
     return {
+        success: true,
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
-        data: results,
+        data: results
     };
-}
+};
+
 
 //get related videos by tags
 export const getRelatedVideos = async (videoId, limit = 10) => {

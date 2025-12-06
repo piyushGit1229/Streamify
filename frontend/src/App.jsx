@@ -16,6 +16,7 @@ import ProfilePage from "./components/profile/ProfilePage";
 import MyCutsPage from "./pages/Library/MyCutsPage";
 import WatchPartyTest from "./WatchPartyTest";
 import WatchPartyPage from "./pages/WatchParty/WatchPartyPage";
+import SearchResultsPage from "./pages/Search/SearchResultsPage";
 
 
 
@@ -144,6 +145,9 @@ export default function App() {
 
 
 <Route path="/test-watchparty" element={<WatchPartyTest />} />
+
+<Route path="/search" element={<SearchResultsPage />} />
+
 
 
 
