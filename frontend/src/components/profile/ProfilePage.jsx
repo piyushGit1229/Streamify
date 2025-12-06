@@ -76,7 +76,7 @@ export default function ProfilePage() {
           </label>
 
           {/* Gradient for readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+          {/* <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div> */}
         </div>
 
         {/* AVATAR + NAME */}

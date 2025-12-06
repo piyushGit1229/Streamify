@@ -6,19 +6,21 @@ import { updateRoomState } from "../services/watchparty.service.js";
 const roomStates = new Map(); // roomCode -> { isPlaying, currentTime, playbackRate }
 
 export const registerWatchPartyHandlers = (io, socket) => {
-  // Client sends: { roomCode, username }
-  socket.on("watchparty:join", ({ roomCode, username }) => {
+  // Client sends: { roomCode, username, userId }
+  socket.on("watchparty:join", ({ roomCode, username, userId }) => {
     if (!roomCode) return;
 
     socket.join(roomCode);
     socket.data.username = username || "Guest";
+    socket.data.userId = userId; // Store user ID for role checking
 
-    console.log(`${socket.id} joined room ${roomCode}`);
+    console.log(`${socket.id} (${userId}) joined room ${roomCode}`);
 
     // Notify others
     socket.to(roomCode).emit("watchparty:user-joined", {
       username: socket.data.username,
       id: socket.id,
+      userId: userId,
     });
 
     // Send current state to the newly joined user (if exists)
@@ -77,11 +79,11 @@ export const registerWatchPartyHandlers = (io, socket) => {
   });
 
   // Host triggers SEEK
-  socket.on("watchparty:seek", async ({ roomCode, currentTime, playbackRate }) => {
+  socket.on("watchparty:seek", async ({ roomCode, currentTime, playbackRate, isPlaying }) => {
     if (!roomCode) return;
 
     const newState = {
-      isPlaying: false,
+      isPlaying: isPlaying || false,
       currentTime: currentTime || 0,
       playbackRate: playbackRate || 1,
     };
@@ -120,6 +122,35 @@ export const registerWatchPartyHandlers = (io, socket) => {
     };
 
     io.to(roomCode).emit("watchparty:reaction", payload);
+  });
+
+  // Emoji reaction (floating emojis)
+  socket.on("watchparty:emoji-reaction", ({ roomCode, emoji }) => {
+    if (!roomCode || !emoji) return;
+
+    const payload = {
+      username: socket.data.username,
+      emoji,
+      userId: socket.data.userId,
+      at: new Date().toISOString(),
+    };
+
+    io.to(roomCode).emit("watchparty:emoji-reaction", payload);
+  });
+
+  // Message reaction (reacting to chat messages)
+  socket.on("watchparty:message-reaction", ({ roomCode, messageId, emoji }) => {
+    if (!roomCode || !messageId || !emoji) return;
+
+    const payload = {
+      messageId,
+      emoji,
+      userId: socket.data.userId,
+      username: socket.data.username,
+      at: new Date().toISOString(),
+    };
+
+    io.to(roomCode).emit("watchparty:message-reaction", payload);
   });
 
   // Cleanup on disconnect

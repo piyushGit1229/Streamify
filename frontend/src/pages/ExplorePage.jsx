@@ -2,14 +2,24 @@ import { useEffect, useState } from "react";
 import { getExploreData } from "../api/exploreApi";
 import { Link } from "react-router-dom";
 
-/* ------------------ CATEGORY LIST ------------------ */
+// React Icons
+import {
+  FiTrendingUp,
+  FiMusic,
+  FiCpu,
+  FiMonitor,
+  FiBookOpen,
+  FiClock,
+} from "react-icons/fi";
+
+/* ------------------ CATEGORY LIST (NO EMOJIS) ------------------ */
 const categories = [
-  { key: "trending", label: "🔥 Trending" },
-  { key: "topMusic", label: "🎵 Music" },
-  { key: "tech", label: "💻 Tech" },
-  { key: "gaming", label: "🎮 Gaming" },
-  { key: "education", label: "🎓 Education" },
-  { key: "recent", label: "🆕 Recent Uploads" },
+  { key: "trending", label: "Trending", icon: <FiTrendingUp size={16} /> },
+  { key: "topMusic", label: "Music", icon: <FiMusic size={16} /> },
+  { key: "tech", label: "Tech", icon: <FiCpu size={16} /> },
+  { key: "gaming", label: "Gaming", icon: <FiMonitor size={16} /> },
+  { key: "education", label: "Education", icon: <FiBookOpen size={16} /> },
+  { key: "recent", label: "Recent Uploads", icon: <FiClock size={16} /> },
 ];
 
 const formatDuration = (sec) => {
@@ -23,9 +33,8 @@ export default function ExplorePage() {
   const [selected, setSelected] = useState("trending");
   const [loading, setLoading] = useState(true);
 
-  // 🔵 BLUE GLOW PARALLAX EFFECT
+  // 🔵 Blue Glow Parallax
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
-
   useEffect(() => {
     const move = (e) => {
       setMouse({
@@ -80,27 +89,34 @@ export default function ExplorePage() {
           </p>
         </div>
 
-        {/* CATEGORY TABS */}
-        <div className="flex gap-3 overflow-x-auto border-b border-white/10 pb-4 sticky top-0 bg-[#0f0f12]/80 backdrop-blur-xl z-20 rounded-lg"
-             style={{ scrollbarWidth: "none" }}>
-
+        {/* CATEGORY TABS (React Icons Instead of Emojis) */}
+        <div className="
+            flex gap-3 overflow-x-auto border-b border-white/10 pb-4
+            sticky top-0 bg-[#0f0f12]/80 backdrop-blur-xl z-20 rounded-lg
+          "
+          style={{ scrollbarWidth: "none" }}
+        >
           {categories.map((cat) => (
             <button
               key={cat.key}
               onClick={() => setSelected(cat.key)}
-              className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200
+              className={`
+                flex items-center gap-2 px-5 py-2 rounded-full text-sm font-semibold
+                transition-all duration-200
                 ${
                   selected === cat.key
                     ? "bg-white text-black shadow-md"
                     : "bg-white/10 hover:bg-white/20 text-gray-300"
-                }`}
+                }
+              `}
             >
+              {cat.icon}
               {cat.label}
             </button>
           ))}
         </div>
 
-        {/* LOADING STATE */}
+        {/* LOADING */}
         {loading && (
           <div className="text-gray-400 mt-10 animate-pulse text-lg">
             Loading Explore...
@@ -127,9 +143,7 @@ export default function ExplorePage() {
   );
 }
 
-/* ===========================
-      VIDEO CARD COMPONENT
-=========================== */
+/* ------------------ VIDEO CARD ------------------ */
 function ExploreCard({ video }) {
   return (
     <Link
@@ -140,20 +154,17 @@ function ExploreCard({ video }) {
         hover:border-blue-500/30 transition-all duration-300 relative
       "
     >
-      {/* THUMBNAIL */}
       <div className="relative w-full aspect-video overflow-hidden">
         <img
           src={video.thumbnailUrl}
           alt={video.title}
           className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
         />
-
         <span className="absolute bottom-1 right-1 bg-black/70 text-[10px] px-2 py-1 rounded">
           {formatDuration(video.duration)}
         </span>
       </div>
 
-      {/* TEXT CONTENT */}
       <div className="p-3">
         <h3 className="font-semibold text-white line-clamp-2 group-hover:text-blue-400 transition">
           {video.title}
@@ -165,15 +176,13 @@ function ExploreCard({ video }) {
   );
 }
 
-/* ===========================
-      POPULAR CHANNELS
-=========================== */
+/* ------------------ POPULAR CHANNELS ------------------ */
 function PopularChannels({ channels }) {
   if (!channels.length) return null;
 
   return (
     <div className="mt-20">
-      <h2 className="text-2xl font-bold mb-6">🌟 Popular Channels</h2>
+      <h2 className="text-2xl font-bold mb-6">Popular Channels</h2>
 
       <div className="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {channels.map((ch) => (

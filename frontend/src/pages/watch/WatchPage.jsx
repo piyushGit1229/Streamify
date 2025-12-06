@@ -1,14 +1,18 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom"; // Added Link for navigation
 import { format } from "date-fns"; // For better date formatting
 import { getHomeFeed } from "../../api/feedApi";
 import { getVideo } from "../../api/videoApi";
 import { likeVideo, dislikeVideo } from "../../api/interactionApi";
 import { subscribe, unsubscribe, channelPage } from "../../api/subscriptionApi";
+
 import CustomVideoPlayer from "../../components/video/CustomVideoPlayer";
 import { FastAverageColor } from 'fast-average-color';
 import AddToPlaylist from "../../components/common/AddToPlaylist";
 import CutCreator from "../../components/cuts/CutCreator";
+import RelatedCard from "../../components/video/RelatedCard";
+import { FiThumbsUp, FiThumbsDown, FiShare2, FiBookmark, FiPlus } from "react-icons/fi";
+
 
 
 
@@ -19,15 +23,8 @@ import {
   getReplies,
   // Assuming API for like/dislike comment exists
 } from "../../api/commentApi";
-import {
-  addWatchLater,
-  removeWatchLater,
-  listWatchLater,
-} from "../../api/watchLaterApi";
-import { getMyPlaylists, addVideoToPlaylist } from "../../api/playlistApi";
-
 import { useAuthStore } from "../../store/authStore";
-import { useLibraryStore } from "../../store/libraryStore";
+import WatchPartyButton from "../../components/watchParty/WatchPartyButton";
 // ============================================
 // UI COMPONENTS - Placeholders/Enhanced
 // ============================================
@@ -91,33 +88,7 @@ const Skeleton = ({ variant }) => {
 
 
 
-// Placeholder for Related Video Card (Crucial for UI)
-const RelatedCard = ({ video }) => (
-  <Link to={`/watch/${video._id}`} className="flex gap-3 hover:bg-[#181824] p-2 rounded-lg transition-colors">
-    <div className="w-[160px] h-[90px] flex-shrink-0 relative overflow-hidden rounded-lg">
-      <img
-        src={video.thumbnailUrl}
-        alt={video.title}
-        className="w-full h-full object-cover"
-      />
-      {/* Duration Overlay */}
-      <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1 rounded">
-        {video.duration || "0:00"} 
-      </span>
-    </div>
-    <div className="flex flex-col justify-between py-1">
-      <h4 className="text-sm font-semibold line-clamp-2 leading-snug text-white">
-        {video.title}
-      </h4>
-      <p className="text-xs text-gray-400">
-        {video.owner.name}
-      </p>
-      <p className="text-xs text-gray-500">
-        {video.views || 0} views
-      </p>
-    </div>
-  </Link>
-);
+
 
 
 
@@ -130,7 +101,6 @@ const RelatedCard = ({ video }) => (
 export default function WatchPage() {
   const { id } = useParams();
   const { user } = useAuthStore();
-  const { updateWatchLaterCount, watchLaterCount } = useLibraryStore();
 
   const [video, setVideo] = useState(null);
   const [channel, setChannel] = useState(null);
@@ -139,13 +109,7 @@ export default function WatchPage() {
   const [relatedVideos, setRelatedVideos] = useState([]);
   const [dominantColor, setDominantColor] = useState('#0a0a0f');
 
-  // Utility function to convert hex to rgba
-  const hexToRgba = (hex, alpha) => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
+
   
 
   // Comments state
@@ -156,24 +120,9 @@ export default function WatchPage() {
   const [showReplies, setShowReplies] = useState({});
   const [replyFormVisibility, setReplyFormVisibility] = useState({}); // To manage reply form for each comment
 
-  // Watch Later and Playlist state
-  const [isInWatchLater, setIsInWatchLater] = useState(false);
-  const [playlists, setPlaylists] = useState([]);
-  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
-  // Close playlist dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        showOptionsMenu &&
-        !event.target.closest(".playlist-dropdown-container")
-      ) {
-        setShowOptionsMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showOptionsMenu]);
+
+
 
   // --------------------------------------------
   // Fetch video + channel + comments + related
@@ -248,28 +197,7 @@ setRelatedVideos(filtered);
     }
   }, [video]);
 
-  // --------------------------------------------
-  // Fetch watch later and playlists (user data)
-  // --------------------------------------------
-  useEffect(() => {
-    async function fetchUserData() {
-      if (!user) return;
-      try {
-        const watchLaterRes = await listWatchLater();
-        // Check if the video ID is in the watch later list
-        const watchLaterIds = watchLaterRes.data.map((item) => item.videoId._id);
-        setIsInWatchLater(watchLaterIds.includes(id));
 
-        const playlistsRes = await getMyPlaylists();
-        setPlaylists(playlistsRes.data.playlists || []);
-        console.log("PLAYLISTS:", playlistsRes.data.playlists);
-
-      } catch (error) {
-        console.error("USER DATA ERROR:", error);
-      }
-    }
-    fetchUserData();
-  }, [id, user]);
 
   if (loading)
   return (
@@ -445,41 +373,7 @@ setRelatedVideos(filtered);
     }
   };
 
-  // ============================================
-  // WATCH LATER HANDLER
-  // ============================================
-  const handleWatchLater = async () => {
-    if (!user) return;
-    try {
-      if (isInWatchLater) {
-        await removeWatchLater(id);
-        setIsInWatchLater(false);
-        updateWatchLaterCount(watchLaterCount - 1);
-        // Add toast: "Removed from Watch Later"
-      } else {
-        await addWatchLater(id);
-        setIsInWatchLater(true);
-        updateWatchLaterCount(watchLaterCount + 1);
-        // Add toast: "Added to Watch Later"
-      }
-    } catch (err) {
-      console.error("WATCH LATER ERROR:", err);
-    }
-  };
 
-  // ============================================
-  // ADD TO PLAYLIST HANDLER
-  // ============================================
-  const handleAddToPlaylist = async (playlistId, playlistName) => {
-    try {
-      await addVideoToPlaylist(playlistId, id);
-      setShowOptionsMenu(false);
-      // Add toast: `Added to playlist ${playlistName}`
-    } catch (err) {
-      console.error("ADD TO PLAYLIST ERROR:", err);
-      // Add toast: "Failed to add to playlist."
-    }
-  };
 
   // ============================================
   // RENDER
@@ -521,58 +415,64 @@ setRelatedVideos(filtered);
                 </div>
 
                 {/* Actions row */}
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
                   {/* LIKE/DISLIKE CONTAINER */}
-                  <div className="flex items-center bg-[#171722] border border-white/10 rounded-full shadow-md overflow-hidden">
+                  <div className="flex items-center bg-white/5 backdrop-blur-sm border border-white/10 rounded-full shadow-lg overflow-hidden">
                     <button
                       onClick={handleLike}
-                      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition duration-200 
+                      className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 group
                                                   ${
                                                     video.isLiked
-                                                      ? "bg-blue-600/20 text-blue-300 hover:bg-blue-600/30"
-                                                      : "text-gray-200 hover:bg-white/10"
+                                                      ? "text-blue-400 hover:bg-blue-500/10"
+                                                      : "text-gray-300 hover:text-white hover:bg-white/10"
                                                   }`}
                     >
-                      <span className="text-lg">👍</span>
-                      <span>{video.likesCount?.toLocaleString() || 0}</span>
+                      <FiThumbsUp
+                        size={18}
+                        className={`transition-all duration-200 ${
+                          video.isLiked ? "fill-current text-blue-400" : "group-hover:scale-110"
+                        }`}
+                      />
+                      <span className="font-semibold">{video.likesCount?.toLocaleString() || 0}</span>
                     </button>
 
-                    <div className="w-px h-6 bg-white/10"></div>
+                    <div className="w-px h-5 bg-white/20"></div>
 
                     <button
                       onClick={handleDislike}
-                      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition duration-200 
+                      className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 group
                                                   ${
                                                     video.isDisliked
-                                                      ? "bg-red-600/20 text-red-300 hover:bg-red-600/30"
-                                                      : "text-gray-200 hover:bg-white/10"
+                                                      ? "text-red-400 hover:bg-red-500/10"
+                                                      : "text-gray-300 hover:text-white hover:bg-white/10"
                                                   }`}
                     >
-                      <span className="text-lg">👎</span>
+                      <FiThumbsDown
+                        size={18}
+                        className={`transition-all duration-200 ${
+                          video.isDisliked ? "fill-current text-red-400" : "group-hover:scale-110"
+                        }`}
+                      />
                     </button>
                   </div>
 
-                  {/* WATCH LATER */}
-                  {user && (
-                    <button
-                      onClick={handleWatchLater}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-white/10 shadow-md transition-colors
-                                                 ${
-                                                   isInWatchLater
-                                                     ? "bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border-yellow-500/70"
-                                                     : "bg-[#171722] text-gray-200 hover:bg-[#1f1f2b]"
-                                                 }`}
-                    >
-                      <span className="text-lg">🕒</span>
-                      <span>
-                        {isInWatchLater ? "Saved" : "Watch Later"}
-                      </span>
-                    </button>
-                  )}
+                  {/* SHARE BUTTON */}
+                  <button
+                    onClick={() => navigator.share?.({ url: window.location.href, title: video.title })}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium border border-white/10 shadow-lg backdrop-blur-sm bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 group"
+                  >
+                    <FiShare2
+                      size={18}
+                      className="transition-all duration-200 group-hover:scale-110"
+                    />
+                    <span className="font-medium">Share</span>
+                  </button>
 
-                 {/* ADD TO PLAYLIST (NEW COMPONENT) */}
-                {user && <AddToPlaylist videoId={video._id} />}
+                  {/* ADD TO PLAYLIST BUTTON */}
+                  {user && <AddToPlaylist videoId={video._id} />}
 
+                  {/* WATCH PARTY BUTTON */}
+                  {user && <WatchPartyButton videoId={video._id} />}
                 </div>
               </div>
             </div>

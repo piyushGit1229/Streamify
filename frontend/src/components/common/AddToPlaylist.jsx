@@ -29,9 +29,9 @@ export default function AddToPlaylist({ videoId }) {
       {/* BUTTON */}
       <button
         onClick={() => setOpen((p) => !p)}
-        className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-[#171722] border border-white/10 shadow-md hover:bg-[#1f1f2b] transition text-gray-200"
+        className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium border border-white/10 shadow-lg backdrop-blur-sm bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 group"
       >
-        📁 Add to Playlist
+        Add to Playlist
       </button>
 
       {/* DROPDOWN */}

@@ -14,6 +14,11 @@ import MysubscriptionsPage from "./pages/Library/SubscriptionsPage";
 import ChannelPage from "./pages/Library/ChannelPage";
 import ProfilePage from "./components/profile/ProfilePage";
 import MyCutsPage from "./pages/Library/MyCutsPage";
+import WatchPartyTest from "./WatchPartyTest";
+import WatchPartyPage from "./pages/WatchParty/WatchPartyPage";
+
+
+
 
 export default function App() {
   return (
@@ -130,6 +135,15 @@ export default function App() {
   }
 />
 
+
+<Route path="/watchparty/:roomCode" element={<WatchPartyPage />} />
+
+
+
+
+
+
+<Route path="/test-watchparty" element={<WatchPartyTest />} />
 
 
 

@@ -1,10 +1,9 @@
-import { getEnabledCategories } from "trace_events";
 import WatchParty from "../models/watchparty.model.js";
-import crpto from "crypto";
+import crypto from "crypto";
 
 //generate room code
 const generateRoomCode = () => {
-    return crpto.randomBytes(3).toString("hex").toUpperCase();
+    return crypto.randomBytes(3).toString("hex").toUpperCase();
 }
 
 //create new watch party room

@@ -23,13 +23,14 @@ export const createRoom = asyncHandler(async (req, res) => {
 });
 
 export const joinRoom = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
   const { roomCode } = req.body;
 
   if (!roomCode) {
     return res.status(400).json({ success: false, message: "roomCode is required" });
   }
 
-  const room = await joinWatchParty({ roomCode });
+  const room = await joinWatchParty({ roomCode, userId });
 
   if (!room) {
     return res
@@ -37,13 +38,18 @@ export const joinRoom = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Watch party not found or inactive" });
   }
 
+  // Check if user is the host
+  const isHost = room.host._id.toString() === userId.toString();
+
   res.json({
     success: true,
     room,
+    isHost,
   });
 });
 
 export const getRoom = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
   const { roomCode } = req.params;
 
   const room = await getRoomByCode(roomCode);
@@ -54,8 +60,12 @@ export const getRoom = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Watch party not found or inactive" });
   }
 
+  // Check if user is the host
+  const isHost = room.host._id.toString() === userId.toString();
+
   res.json({
     success: true,
     room,
+    isHost,
   });
 });
