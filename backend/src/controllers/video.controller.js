@@ -36,8 +36,9 @@ export const uploadVideo = asyncHandler(async (req, res) => {
 
 //get single video by id using videoqueryservice
 export const getVideo = asyncHandler(async (req, res) => {
-  const inc = req.query.inc === "true";
-  let video = await getVideoById(req.params.id, { incViews: inc });
+  const userId = req.user ? req.user._id : null;
+  const incViews = req.query.inc === 'true';
+  let video = await getVideoById(req.params.id, { incViews, userId });
 
   if (!video) return res.status(404).json({ error: "Video not found" });
 
@@ -73,6 +74,10 @@ export const getVideo = asyncHandler(async (req, res) => {
     video.isDisliked = false;
     video.isSubscribed = false;
   }
+
+  console.log("REQ.USER:", req.user?._id);
+console.log("QUERY INC:", req.query.inc);
+
 
   // ---------------------------------------------
   res.status(200).json({ success: true, video });

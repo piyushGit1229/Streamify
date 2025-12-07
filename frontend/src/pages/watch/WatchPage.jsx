@@ -131,7 +131,7 @@ export default function WatchPage() {
     async function fetchData() {
       setLoading(true);
       try {
-        const res = await getVideo(id);
+        const res = await getVideo(id, true);
         setVideo(res.data.video);
 
         const channelRes = await channelPage(res.data.video.owner._id);

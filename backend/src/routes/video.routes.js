@@ -21,7 +21,7 @@ router.get("/trending", trending);
 router.get("/feed", authMiddleware, feed);
 router.get("/search", search);
 router.get("/:id/related", relatedVideos);
-router.get("/:id", getVideo); // ALWAYS keep this last
+router.get("/:id",authMiddleware, getVideo); // ALWAYS keep this last
 
 
 export default router;
