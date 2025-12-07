@@ -1,5 +1,13 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import {
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Minimize,
+} from "lucide-react";
 
 export default function CustomVideoPlayer({ src, poster }) {
   const videoRef = useRef(null);
@@ -16,14 +24,20 @@ export default function CustomVideoPlayer({ src, poster }) {
   const [fullscreen, setFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
 
-  // Auto-hide controls
+  // NEW: Center tap Play/Pause Indicator
+  const [centerIcon, setCenterIcon] = useState(null);
+
+  const triggerCenterIcon = (type) => {
+    setCenterIcon(type);
+    setTimeout(() => setCenterIcon(null), 500);
+  };
+
   useEffect(() => {
     if (!showControls) return;
-    const timer = setTimeout(() => setShowControls(false), 3000);
+    const timer = setTimeout(() => setShowControls(false), 2500);
     return () => clearTimeout(timer);
   }, [showControls]);
 
-  // Load metadata → jump to start position + auto-play
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -31,27 +45,21 @@ export default function CustomVideoPlayer({ src, poster }) {
     const handleLoadedMetadata = async () => {
       setDuration(video.duration);
 
-      // Jump to cut start if exists
       if (startSeconds !== null) {
         video.currentTime = startSeconds;
         setCurrent(startSeconds);
       }
 
-      // Try autoplay
       try {
         await video.play();
         setPlaying(true);
-      } catch (err) {
-        // Browser blocked autoplay → force muted autoplay
+      } catch {
         video.muted = true;
         setMuted(true);
-
         try {
           await video.play();
           setPlaying(true);
-        } catch (finalError) {
-          console.warn("Autoplay blocked even when muted:", finalError);
-        }
+        } catch {}
       }
     };
 
@@ -60,26 +68,25 @@ export default function CustomVideoPlayer({ src, poster }) {
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
   }, [startSeconds]);
 
-  // Prevent seeking outside region + stop at end
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    let block = false;
+    let lock = false;
 
     const handleSeeking = () => {
-      if (block) return;
+      if (lock) return;
 
       if (startSeconds !== null && video.currentTime < startSeconds) {
-        block = true;
+        lock = true;
         video.currentTime = startSeconds;
-        setTimeout(() => (block = false), 50);
+        setTimeout(() => (lock = false), 50);
       }
 
       if (endSeconds !== null && video.currentTime > endSeconds) {
-        block = true;
+        lock = true;
         video.currentTime = endSeconds;
-        setTimeout(() => (block = false), 50);
+        setTimeout(() => (lock = false), 50);
       }
     };
 
@@ -95,7 +102,6 @@ export default function CustomVideoPlayer({ src, poster }) {
 
     video.addEventListener("seeking", handleSeeking);
     video.addEventListener("timeupdate", handleTimeUpdate);
-
     return () => {
       video.removeEventListener("seeking", handleSeeking);
       video.removeEventListener("timeupdate", handleTimeUpdate);
@@ -109,9 +115,11 @@ export default function CustomVideoPlayer({ src, poster }) {
     if (v.paused) {
       v.play();
       setPlaying(true);
+      triggerCenterIcon("play");
     } else {
       v.pause();
       setPlaying(false);
+      triggerCenterIcon("pause");
     }
 
     setShowControls(true);
@@ -125,7 +133,6 @@ export default function CustomVideoPlayer({ src, poster }) {
 
   const toggleFullscreen = () => {
     const wrapper = wrapperRef.current;
-
     if (!document.fullscreenElement) {
       wrapper.requestFullscreen();
       setFullscreen(true);
@@ -138,21 +145,20 @@ export default function CustomVideoPlayer({ src, poster }) {
   };
 
   const handleSeek = (e) => {
-    const time = Number(e.target.value);
+    const t = Number(e.target.value);
+    if (startSeconds !== null && t < startSeconds) return;
+    if (endSeconds !== null && t > endSeconds) return;
 
-    if (startSeconds !== null && time < startSeconds) return;
-    if (endSeconds !== null && time > endSeconds) return;
-
-    videoRef.current.currentTime = time;
-    setCurrent(time);
+    videoRef.current.currentTime = t;
+    setCurrent(t);
     setShowControls(true);
   };
 
-  const format = (s) => {
-    if (s === null || s === undefined) return "0:00";
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60).toString().padStart(2, "0");
-    return `${m}:${sec}`;
+  const format = (time) => {
+    if (!time && time !== 0) return "0:00";
+    const m = Math.floor(time / 60);
+    const s = Math.floor(time % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
   };
 
   return (
@@ -160,21 +166,35 @@ export default function CustomVideoPlayer({ src, poster }) {
       ref={wrapperRef}
       className="relative group rounded-xl overflow-hidden"
       onMouseMove={() => setShowControls(true)}
+      onClick={togglePlay} // tap to play/pause
     >
       <video
         ref={videoRef}
         src={src}
         poster={poster}
-        className="w-full h-full rounded-xl"
+        className="w-full h-full rounded-xl select-none"
       />
 
-      {/* CONTROLS */}
+      {/* CENTER PLAY/PAUSE ICON */}
+      {centerIcon && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="bg-black/40 p-6 rounded-full">
+            {centerIcon === "play" ? (
+              <Play size={60} className="text-white" />
+            ) : (
+              <Pause size={60} className="text-white" />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CLEAN FLOATING CONTROLS, NO BACKGROUND */}
       <div
-        className={`absolute bottom-0 left-0 right-0 transition-all duration-300 ${
+        className={`absolute bottom-4 left-0 right-0 transition-all duration-300 ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
-        <div className="w-full h-28 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end px-5 pb-4">
+        <div className="w-full flex flex-col gap-3 px-6">
 
           {/* Seekbar */}
           <input
@@ -183,27 +203,32 @@ export default function CustomVideoPlayer({ src, poster }) {
             max={endSeconds ?? duration}
             value={current}
             onChange={handleSeek}
-            className="w-full h-1.5 cursor-pointer accent-red-600 rounded-full"
+            className="
+              w-full h-1.5 cursor-pointer rounded-full accent-blue-500
+              [&::-webkit-slider-thumb]:h-4
+              [&::-webkit-slider-thumb]:w-4
+              [&::-webkit-slider-thumb]:rounded-full
+              [&::-webkit-slider-thumb]:bg-blue-500
+            "
           />
 
-          {/* Buttons */}
-          <div className="flex items-center justify-between mt-3">
+          {/* Bottom Controls */}
+          <div className="flex items-center justify-between">
 
             <div className="flex items-center gap-4">
+
               {/* Play/Pause */}
               <button
-                onClick={togglePlay}
-                className="bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full p-3 text-white shadow-lg transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePlay();
+                }}
+                className="p-2.5 rounded-full bg-black/30 hover:bg-black/40 transition"
               >
                 {playing ? (
-                  <svg width="22" height="22" fill="white">
-                    <rect x="5" y="4" width="5" height="14" rx="2" />
-                    <rect x="12" y="4" width="5" height="14" rx="2" />
-                  </svg>
+                  <Pause size={22} className="text-white" />
                 ) : (
-                  <svg width="22" height="22" fill="white">
-                    <polygon points="6,4 18,11 6,18" />
-                  </svg>
+                  <Play size={22} className="text-white" />
                 )}
               </button>
 
@@ -214,19 +239,33 @@ export default function CustomVideoPlayer({ src, poster }) {
 
               {/* Mute */}
               <button
-                onClick={toggleMute}
-                className="bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full p-3 text-white shadow-lg transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleMute();
+                }}
+                className="p-2.5 rounded-full bg-black/30 hover:bg-black/40 transition"
               >
-                {muted ? "🔈" : "🔊"}
+                {muted ? (
+                  <VolumeX size={22} className="text-white" />
+                ) : (
+                  <Volume2 size={22} className="text-white" />
+                )}
               </button>
             </div>
 
             {/* Fullscreen */}
             <button
-              onClick={toggleFullscreen}
-              className="bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full p-3 text-white shadow-lg transition"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFullscreen();
+              }}
+              className="p-2.5 rounded-full bg-black/30 hover:bg-black/40 transition"
             >
-              {fullscreen ? "↙" : "⛶"}
+              {fullscreen ? (
+                <Minimize size={22} className="text-white" />
+              ) : (
+                <Maximize size={22} className="text-white" />
+              )}
             </button>
           </div>
 
