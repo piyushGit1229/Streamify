@@ -21,6 +21,7 @@ export const router = createBrowserRouter([
       { path: "explore", element: <ExplorePage /> },
       { path: "trending", element: <TrendingPage /> },
       { path: "library", element: <LibraryPage /> },
+      { path: "channel/:channelId", element: <ChannelPage /> },
       { path: "upload", element: <UploadPage /> },
       { path: "watch/:videoId", element: <WatchPage /> },
     ],

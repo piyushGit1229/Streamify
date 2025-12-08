@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Play,
@@ -7,9 +7,17 @@ import {
   VolumeX,
   Maximize,
   Minimize,
+  RotateCcw,
+  RotateCw,
 } from "lucide-react";
+import { getVideo } from "../../api/videoApi";
 
-export default function CustomVideoPlayer({ src, poster }) {
+export default function CustomVideoPlayer({
+  id,
+  src,
+  poster,
+  onViewsIncremented,
+}) {
   const videoRef = useRef(null);
   const wrapperRef = useRef(null);
 
@@ -23,92 +31,161 @@ export default function CustomVideoPlayer({ src, poster }) {
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [viewsIncremented, setViewsIncremented] = useState(false);
 
-  // NEW: Center tap Play/Pause Indicator
+  // Center play/pause flash
   const [centerIcon, setCenterIcon] = useState(null);
-
-  const triggerCenterIcon = (type) => {
-    setCenterIcon(type);
+  const triggerCenterIcon = (icon) => {
+    setCenterIcon(icon);
     setTimeout(() => setCenterIcon(null), 500);
   };
 
+  // Seek flash animation
+  const [seekFlash, setSeekFlash] = useState(null);
+  const triggerSeekFlash = (type) => {
+    setSeekFlash(type);
+    setTimeout(() => setSeekFlash(null), 350);
+  };
+
+  // SPEED CONTROLLER MENU
+  const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+
+  const toggleSpeedMenu = (e) => {
+    e.stopPropagation();
+    setSpeedMenuOpen((p) => !p);
+  };
+
+  const changeSpeed = (value) => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    v.playbackRate = value;
+    setPlaybackRate(value);
+    setSpeedMenuOpen(false);
+  };
+
+  // Auto hide controls
   useEffect(() => {
     if (!showControls) return;
-    const timer = setTimeout(() => setShowControls(false), 2500);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setShowControls(false), 2500);
+    return () => clearTimeout(t);
   }, [showControls]);
 
+  // Load meta + autoplay
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const v = videoRef.current;
+    if (!v) return;
 
-    const handleLoadedMetadata = async () => {
-      setDuration(video.duration);
+    const handleLoaded = async () => {
+      setDuration(v.duration);
 
       if (startSeconds !== null) {
-        video.currentTime = startSeconds;
+        v.currentTime = startSeconds;
         setCurrent(startSeconds);
       }
 
       try {
-        await video.play();
+        await v.play();
         setPlaying(true);
       } catch {
-        video.muted = true;
+        v.muted = true;
         setMuted(true);
         try {
-          await video.play();
+          await v.play();
           setPlaying(true);
         } catch {}
       }
     };
 
-    video.addEventListener("loadedmetadata", handleLoadedMetadata);
-    return () =>
-      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+    v.addEventListener("loadedmetadata", handleLoaded);
+    return () => v.removeEventListener("loadedmetadata", handleLoaded);
   }, [startSeconds]);
 
+  // SEEK LIMITS + VIEW INCREMENT
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const v = videoRef.current;
+    if (!v) return;
 
     let lock = false;
 
     const handleSeeking = () => {
       if (lock) return;
 
-      if (startSeconds !== null && video.currentTime < startSeconds) {
+      if (startSeconds !== null && v.currentTime < startSeconds) {
         lock = true;
-        video.currentTime = startSeconds;
-        setTimeout(() => (lock = false), 50);
+        v.currentTime = startSeconds;
+        setTimeout(() => (lock = false), 40);
       }
 
-      if (endSeconds !== null && video.currentTime > endSeconds) {
+      if (endSeconds !== null && v.currentTime > endSeconds) {
         lock = true;
-        video.currentTime = endSeconds;
-        setTimeout(() => (lock = false), 50);
+        v.currentTime = endSeconds;
+        setTimeout(() => (lock = false), 40);
       }
     };
 
     const handleTimeUpdate = () => {
-      setCurrent(video.currentTime);
+      setCurrent(v.currentTime);
 
-      if (endSeconds !== null && video.currentTime >= endSeconds) {
-        video.pause();
+      if (endSeconds !== null && v.currentTime >= endSeconds) {
+        v.pause();
         setPlaying(false);
-        video.currentTime = endSeconds;
+        v.currentTime = endSeconds;
       }
     };
 
-    video.addEventListener("seeking", handleSeeking);
-    video.addEventListener("timeupdate", handleTimeUpdate);
-    return () => {
-      video.removeEventListener("seeking", handleSeeking);
-      video.removeEventListener("timeupdate", handleTimeUpdate);
+    const handlePlay = async () => {
+      if (!viewsIncremented && id) {
+        try {
+          const res = await getVideo(id, true);
+          setViewsIncremented(true);
+          onViewsIncremented(res.data.video);
+        } catch {}
+      }
     };
-  }, [startSeconds, endSeconds]);
 
-  const togglePlay = () => {
+    v.addEventListener("seeking", handleSeeking);
+    v.addEventListener("timeupdate", handleTimeUpdate);
+    v.addEventListener("play", handlePlay);
+
+    return () => {
+      v.removeEventListener("seeking", handleSeeking);
+      v.removeEventListener("timeupdate", handleTimeUpdate);
+      v.removeEventListener("play", handlePlay);
+    };
+  }, [startSeconds, endSeconds, viewsIncremented, id]);
+
+  // SEEK BACKWARD
+  const seekBackward = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    let t = v.currentTime - 10;
+    if (startSeconds !== null) t = Math.max(t, startSeconds);
+
+    v.currentTime = t;
+    setCurrent(t);
+    triggerSeekFlash("back");
+    setShowControls(true);
+  }, [startSeconds]);
+
+  // SEEK FORWARD
+  const seekForward = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    let t = v.currentTime + 10;
+    if (endSeconds !== null) t = Math.min(t, endSeconds);
+
+    v.currentTime = t;
+    setCurrent(t);
+    triggerSeekFlash("forward");
+    setShowControls(true);
+  }, [endSeconds]);
+
+  // PLAY/PAUSE
+  const togglePlay = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
 
@@ -121,31 +198,33 @@ export default function CustomVideoPlayer({ src, poster }) {
       setPlaying(false);
       triggerCenterIcon("pause");
     }
-
     setShowControls(true);
-  };
+  }, []);
 
-  const toggleMute = () => {
-    videoRef.current.muted = !muted;
-    setMuted(!muted);
+  const toggleMute = useCallback(() => {
+    const v = videoRef.current;
+    v.muted = !v.muted;
+    setMuted(v.muted);
     setShowControls(true);
-  };
+  }, []);
 
-  const toggleFullscreen = () => {
-    const wrapper = wrapperRef.current;
+  const toggleFullscreen = useCallback(() => {
+    const w = wrapperRef.current;
+
     if (!document.fullscreenElement) {
-      wrapper.requestFullscreen();
+      w.requestFullscreen();
       setFullscreen(true);
     } else {
       document.exitFullscreen();
       setFullscreen(false);
     }
-
     setShowControls(true);
-  };
+  }, []);
 
+  // Seek bar
   const handleSeek = (e) => {
     const t = Number(e.target.value);
+
     if (startSeconds !== null && t < startSeconds) return;
     if (endSeconds !== null && t > endSeconds) return;
 
@@ -154,19 +233,92 @@ export default function CustomVideoPlayer({ src, poster }) {
     setShowControls(true);
   };
 
-  const format = (time) => {
-    if (!time && time !== 0) return "0:00";
-    const m = Math.floor(time / 60);
-    const s = Math.floor(time % 60).toString().padStart(2, "0");
+  // KEYBOARD SHORTCUTS
+  useEffect(() => {
+    const handler = (e) => {
+      const v = videoRef.current;
+      if (!v) return;
+
+      // SHIFT + < >
+      if (e.shiftKey && e.key === ">") {
+        e.preventDefault();
+        changeSpeed(Math.min(playbackRate + 0.25, 2));
+        return;
+      }
+      if (e.shiftKey && e.key === "<") {
+        e.preventDefault();
+        changeSpeed(Math.max(playbackRate - 0.25, 0.25));
+        return;
+      }
+
+      switch (e.key) {
+        case "ArrowLeft":
+          e.preventDefault();
+          seekBackward();
+          break;
+
+        case "ArrowRight":
+          e.preventDefault();
+          seekForward();
+          break;
+
+        case "ArrowUp":
+          e.preventDefault();
+          v.volume = Math.min(1, v.volume + 0.05);
+          break;
+
+        case "ArrowDown":
+          e.preventDefault();
+          v.volume = Math.max(0, v.volume - 0.05);
+          break;
+
+        case " ":
+        case "Enter":
+          e.preventDefault();
+          togglePlay();
+          break;
+
+        case "m":
+        case "M":
+          toggleMute();
+          break;
+
+        case "f":
+        case "F":
+          toggleFullscreen();
+          break;
+      }
+
+      setShowControls(true);
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [
+    playbackRate,
+    seekBackward,
+    seekForward,
+    togglePlay,
+    toggleMute,
+    toggleFullscreen,
+  ]);
+
+  const format = (t) => {
+    if (!t && t !== 0) return "0:00";
+    const m = Math.floor(t / 60);
+    const s = Math.floor(t % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
   };
 
+  // =========================================
+  // RENDER UI
+  // =========================================
   return (
     <div
       ref={wrapperRef}
       className="relative group rounded-xl overflow-hidden"
       onMouseMove={() => setShowControls(true)}
-      onClick={togglePlay} // tap to play/pause
+      onClick={togglePlay}
     >
       <video
         ref={videoRef}
@@ -175,9 +327,9 @@ export default function CustomVideoPlayer({ src, poster }) {
         className="w-full h-full rounded-xl select-none"
       />
 
-      {/* CENTER PLAY/PAUSE ICON */}
+      {/* Center Play/Pause Flash */}
       {centerIcon && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center z-20">
           <div className="bg-black/40 p-6 rounded-full">
             {centerIcon === "play" ? (
               <Play size={60} className="text-white" />
@@ -188,34 +340,48 @@ export default function CustomVideoPlayer({ src, poster }) {
         </div>
       )}
 
-      {/* CLEAN FLOATING CONTROLS, NO BACKGROUND */}
+      {/* Seek Flash */}
+      {seekFlash && (
+        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+          <div className="text-white text-5xl font-bold animate-pulse">
+            {seekFlash === "forward" ? "⟳ 10" : "⟲ 10"}
+          </div>
+        </div>
+      )}
+
+      {/* CONTROLS */}
       <div
-        className={`absolute bottom-4 left-0 right-0 transition-all duration-300 ${
+        className={`absolute bottom-4 left-0 right-0 z-30 transition-all duration-300 ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         <div className="w-full flex flex-col gap-3 px-6">
 
-          {/* Seekbar */}
+          {/* Seek Bar */}
           <input
             type="range"
             min={startSeconds ?? 0}
             max={endSeconds ?? duration}
             value={current}
             onChange={handleSeek}
-            className="
-              w-full h-1.5 cursor-pointer rounded-full accent-blue-500
-              [&::-webkit-slider-thumb]:h-4
-              [&::-webkit-slider-thumb]:w-4
-              [&::-webkit-slider-thumb]:rounded-full
-              [&::-webkit-slider-thumb]:bg-blue-500
-            "
+            className="w-full h-1.5 cursor-pointer rounded-full accent-blue-500"
           />
 
-          {/* Bottom Controls */}
+          {/* Bottom Row */}
           <div className="flex items-center justify-between">
 
             <div className="flex items-center gap-4">
+
+              {/* -10 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  seekBackward();
+                }}
+                className="p-2.5 rounded-full bg-black/30 hover:bg-black/50 transition"
+              >
+                <RotateCcw size={22} className="text-white" />
+              </button>
 
               {/* Play/Pause */}
               <button
@@ -223,13 +389,24 @@ export default function CustomVideoPlayer({ src, poster }) {
                   e.stopPropagation();
                   togglePlay();
                 }}
-                className="p-2.5 rounded-full bg-black/30 hover:bg-black/40 transition"
+                className="p-2.5 rounded-full bg-black/30 hover:bg-black/50 transition"
               >
                 {playing ? (
                   <Pause size={22} className="text-white" />
                 ) : (
                   <Play size={22} className="text-white" />
                 )}
+              </button>
+
+              {/* +10 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  seekForward();
+                }}
+                className="p-2.5 rounded-full bg-black/30 hover:bg-black/50 transition"
+              >
+                <RotateCw size={22} className="text-white" />
               </button>
 
               {/* Time */}
@@ -243,7 +420,7 @@ export default function CustomVideoPlayer({ src, poster }) {
                   e.stopPropagation();
                   toggleMute();
                 }}
-                className="p-2.5 rounded-full bg-black/30 hover:bg-black/40 transition"
+                className="p-2.5 rounded-full bg-black/30 hover:bg-black/50 transition"
               >
                 {muted ? (
                   <VolumeX size={22} className="text-white" />
@@ -251,15 +428,47 @@ export default function CustomVideoPlayer({ src, poster }) {
                   <Volume2 size={22} className="text-white" />
                 )}
               </button>
+
+              {/* SPEED BUTTON */}
+              <button
+                onClick={toggleSpeedMenu}
+                className="p-2.5 rounded-full bg-black/30 hover:bg-black/50 transition relative"
+              >
+                <span className="text-white text-sm font-semibold">
+                  {playbackRate}x
+                </span>
+              </button>
+
+              {/* SPEED MENU */}
+              {speedMenuOpen && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute bottom-16 right-6 bg-black/60 backdrop-blur-xl rounded-xl p-3 w-32 z-40 flex flex-col gap-2 animate-fadeIn"
+                >
+                  {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
+                    <button
+                      key={rate}
+                      onClick={() => changeSpeed(rate)}
+                      className={`px-3 py-1 rounded-lg text-left transition ${
+                        playbackRate === rate
+                          ? "bg-blue-500 text-white"
+                          : "hover:bg-white/10 text-white"
+                      }`}
+                    >
+                      {rate === 1 ? "Normal" : `${rate}x`}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Fullscreen */}
+            {/* FULLSCREEN */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 toggleFullscreen();
               }}
-              className="p-2.5 rounded-full bg-black/30 hover:bg-black/40 transition"
+              className="p-2.5 rounded-full bg-black/30 hover:bg-black/50 transition"
             >
               {fullscreen ? (
                 <Minimize size={22} className="text-white" />
@@ -267,8 +476,8 @@ export default function CustomVideoPlayer({ src, poster }) {
                 <Maximize size={22} className="text-white" />
               )}
             </button>
-          </div>
 
+          </div>
         </div>
       </div>
     </div>

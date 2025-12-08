@@ -9,19 +9,24 @@ export const getVideoById = async (id, options = { incViews: false, userId: null
   // ⭐ FIX: prevent options from being null
   options = options || { incViews: false, userId: null };
 
-  if (options.incViews && options.userId) {
-
-    const alreadyViewed = await VideoView.findOne({
-      userId: options.userId,
-      videoId: id
-    });
-
-    if (!alreadyViewed) {
-      await VideoView.create({
+  if (options.incViews) {
+    if (options.userId) {
+      // For logged-in users, increment only once per user per video
+      const alreadyViewed = await VideoView.findOne({
         userId: options.userId,
         videoId: id
       });
 
+      if (!alreadyViewed) {
+        await VideoView.create({
+          userId: options.userId,
+          videoId: id
+        });
+
+        await Video.findByIdAndUpdate(id, { $inc: { views: 1 } });
+      }
+    } else {
+      // For anonymous users, increment on every view
       await Video.findByIdAndUpdate(id, { $inc: { views: 1 } });
     }
   }

@@ -1,7 +1,7 @@
 import { axiosInstance } from "./axiosInstance";
 
 export const getVideo = (id, incViews = false) =>
-  axiosInstance.get(`/videos/${id}${incViews ? '?inc=true' : ''}`);
+axiosInstance.get(`/videos/${id}${incViews ? '?inc=true' : ''}`);
 
 // export const getRelatedVideos = (id) =>
 //   axiosInstance.get(`/videos/${id}/related`);
